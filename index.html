@@ -68,7 +68,7 @@
             cantidadEstrellas: 15000,
             cantidadFotos: 100,     
             cantidadFrases: 100,    
-            radioGalaxia: 40
+            radioGalaxia: 45
         };
 
         let scene, camera, renderer, controls, heartMesh, composer;
@@ -78,10 +78,9 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.02);
             
             camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 20, 70);
+            camera.position.set(0, 30, 80);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -91,32 +90,23 @@
             composer = new EffectComposer(renderer);
             const renderPass = new RenderPass(scene, camera);
             composer.addPass(renderPass);
+            
+            // Estela ajustada para que el rastro de luz ayude a la iluminación
             const afterimagePass = new AfterimagePass(0.20);
             composer.addPass(afterimagePass);
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5;
-            controls.maxDistance = 200;
-            controls.minDistance = 20;
+            controls.autoRotateSpeed = 0.6;
 
-            // ==========================================
-            // CORRECCIÓN DE LUCES (AQUÍ ESTÁ LA SOLUCIÓN)
-            // ==========================================
-            
-            // 1. Luz Hemisférica: Ilumina todo uniformemente (evita que se vea oscuro)
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2.0);
-            scene.add(hemiLight);
-
-            // 2. Luz Ambiental suave extra
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            // Luces potentes de respaldo
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
             scene.add(ambientLight);
-
-            // 3. Luz puntual fuerte desde el centro
-            const pointLight = new THREE.PointLight(config.colorCorazon, 4, 200);
-            scene.add(pointLight);
-            // ==========================================
+            
+            const pointLight = new THREE.PointLight(0xffffff, 2, 200);
+            camera.add(pointLight); // La luz ahora sigue a la cámara (como una linterna)
+            scene.add(camera);
 
             createHeart();
             createMassiveStarfield();
@@ -132,18 +122,15 @@
 
         function getCircleTexture() {
             const canvas = document.createElement('canvas');
-            canvas.width = 32;
-            canvas.height = 32;
+            canvas.width = 64; // Más resolución para círculos más limpios
+            canvas.height = 64;
             const ctx = canvas.getContext('2d');
-
-            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
             gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.5, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(0.4, 'rgba(255,255,255,0.6)');
             gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 32, 32);
-
+            ctx.fillRect(0, 0, 64, 64);
             return new THREE.CanvasTexture(canvas);
         }
 
@@ -162,13 +149,9 @@
             const geometry = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
             geometry.center();
 
-            // CORRECCIÓN MATERIAL: Mucho más brillo (emissiveIntensity alto)
-            const material = new THREE.MeshStandardMaterial({ 
-                color: config.colorCorazon,
-                emissive: config.colorCorazon,
-                emissiveIntensity: 2.5, // Brillo muy intenso
-                roughness: 0.1,         // Más liso y brillante
-                metalness: 0.1
+            // CAMBIO: MeshBasicMaterial ignora las sombras y siempre brilla al 100%
+            const material = new THREE.MeshBasicMaterial({ 
+                color: config.colorCorazon
             });
 
             heartMesh = new THREE.Mesh(geometry, material);
@@ -182,32 +165,30 @@
             const colors = [];
             for (let i = 0; i < config.cantidadEstrellas; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * 250;
+                const radius = Math.random() * 280;
                 const spiralOffset = radius * 0.5 * Math.sin(radius * 0.02 + angle);
-                
-                const x = Math.cos(angle) * radius + spiralOffset;
-                const y = (Math.random() - 0.5) * (20 - radius * 0.05);
-                const z = Math.sin(angle) * radius + spiralOffset;
-                pos.push(x, y, z);
-                
+                pos.push(
+                    Math.cos(angle) * radius + spiralOffset,
+                    (Math.random() - 0.5) * 30,
+                    Math.sin(angle) * radius + spiralOffset
+                );
                 const colorType = Math.random();
-                if (colorType < 0.33) colors.push(1, 0.4, 0.7); 
-                else if (colorType < 0.66) colors.push(0.6, 0.2, 1); 
-                else colors.push(0.3, 0.6, 1); 
+                if (colorType < 0.33) colors.push(1, 0.4, 0.8); 
+                else if (colorType < 0.66) colors.push(0.7, 0.3, 1); 
+                else colors.push(0.4, 0.7, 1); 
             }
             geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             
-            const circleMap = getCircleTexture();
-
             const mat = new THREE.PointsMaterial({ 
-                size: 1.5, 
+                size: 1.8, 
                 vertexColors: true, 
                 transparent: true, 
-                opacity: 0.9,
-                map: circleMap, 
+                opacity: 1,
+                map: getCircleTexture(), 
                 alphaTest: 0.01, 
-                depthWrite: false 
+                depthWrite: false,
+                blending: THREE.AdditiveBlending // Esto hace que las estrellas brillen al encimarse
             });
 
             const stars = new THREE.Points(geo, mat);
@@ -221,8 +202,9 @@
             
             for (let i = 0; i < config.cantidadFotos; i++) {
                 const tex = loader.load(config.imagenes[i % config.imagenes.length]);
+                // CAMBIO: MeshBasicMaterial para fotos brillantes
                 const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
-                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), mat);
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), mat);
                 setRandomPos(mesh, config.radioGalaxia);
                 floatingGroup.add(mesh);
             }
@@ -230,16 +212,11 @@
             fontLoader.load('https://unpkg.com/three@0.160.0/examples/fonts/helvetiker_bold.typeface.json', (font) => {
                 for (let i = 0; i < config.cantidadFrases; i++) {
                     const frase = config.frases[i % config.frases.length];
-                    const geo = new TextGeometry(frase, { font: font, size: 1.8, height: 0.3 });
+                    const geo = new TextGeometry(frase, { font: font, size: 2.2, height: 0.2 });
                     geo.center();
-                    
-                    // CORRECCIÓN TEXTO: También brilla más
-                    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ 
-                        color: config.colorTexto,
-                        emissive: config.colorTexto,
-                        emissiveIntensity: 1.2
-                    }));
-                    setRandomPos(mesh, config.radioGalaxia + 15);
+                    // CAMBIO: MeshBasicMaterial para texto que no se oscurece
+                    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: config.colorTexto }));
+                    setRandomPos(mesh, config.radioGalaxia + 10);
                     floatingGroup.add(mesh);
                 }
             });
@@ -249,15 +226,13 @@
 
         function setRandomPos(obj, baseRadius) {
             const angle = Math.random() * Math.PI * 2;
-            const r = baseRadius + (Math.random() - 0.5) * 40;
-            const spiralOffset = r * 0.3 * Math.sin(r * 0.05 + angle);
-
+            const r = baseRadius + (Math.random() - 0.5) * 50;
             obj.position.set(
-                Math.cos(angle) * r + spiralOffset,
-                (Math.random() - 0.5) * 40,
-                Math.sin(angle) * r + spiralOffset
+                Math.cos(angle) * r,
+                (Math.random() - 0.5) * 45,
+                Math.sin(angle) * r
             );
-            obj.userData = { speed: 0.003 + Math.random() * 0.008, offset: Math.random() * 10 };
+            obj.userData = { offset: Math.random() * 10 };
         }
 
         function onWindowResize() {
@@ -273,12 +248,12 @@
             controls.update();
 
             if (heartMesh) {
-                heartMesh.scale.setScalar(0.5 + Math.sin(t * 3) * 0.03); 
-                heartMesh.rotation.y += 0.005;
+                heartMesh.scale.setScalar(0.5 + Math.sin(t * 3) * 0.05);
+                heartMesh.rotation.y += 0.008;
             }
 
             floatingGroup.rotation.y += config.velocidadGiro;
-            starsGroup.rotation.y += config.velocidadGiro * 0.7;
+            starsGroup.rotation.y += config.velocidadGiro * 0.5;
 
             floatingGroup.children.forEach(child => {
                 child.position.y += Math.sin(t + child.userData.offset) * 0.03;
@@ -294,3 +269,4 @@
 </body>
 
 </html>
+
