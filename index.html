@@ -92,7 +92,7 @@
             composer.addPass(renderPass);
             
             // Estela ajustada para que el rastro de luz ayude a la iluminación
-            const afterimagePass = new AfterimagePass(0.20);
+            const afterimagePass = new AfterimagePass(0.80);
             composer.addPass(afterimagePass);
 
             controls = new OrbitControls(camera, renderer.domElement);
@@ -269,4 +269,5 @@
 </body>
 
 </html>
+
 
